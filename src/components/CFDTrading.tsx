@@ -1,6 +1,47 @@
 import React, { useState, useMemo } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { ShieldAlert, Info, Percent, ChevronUp, ChevronDown, CheckCircle, Activity, TrendingUp, DollarSign } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine
+} from 'recharts';
+
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isSuccess = data.pnl >= 0;
+    return (
+      <div className="bg-white/95 backdrop-blur-md border border-[#EAECE0] shadow-xl p-3.5 rounded-2xl text-left select-none max-w-xs">
+        <p className="text-[10px] text-[#8B8D7A] font-bold uppercase tracking-wider font-mono">
+          {data.tradeIndex} – {data.symbol} ({data.type})
+        </p>
+        <p className="text-xs font-serif font-bold text-natural-dark mt-1">Ref ID: {data.id}</p>
+        <div className="mt-2 space-y-1 text-xs">
+          <div className="flex justify-between gap-6">
+            <span className="text-[#8B8D7A] font-semibold">Trade P&L:</span>
+            <span className={`font-mono font-black ${isSuccess ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {isSuccess ? '+' : ''}${data.pnl.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-[#8B8D7A] font-semibold">Cumulative Total:</span>
+            <span className={`font-mono font-bold ${data.cumulativePnl >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+              {data.cumulativePnl >= 0 ? '+' : ''}${data.cumulativePnl.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export const CFDTrading: React.FC = () => {
   const { user, marketAssets, trades, openTrade, closeTrade } = useDashboard();
@@ -14,6 +55,33 @@ export const CFDTrading: React.FC = () => {
   const currentAsset = useMemo(() => {
     return marketAssets.find(a => a.symbol === selectedSymbol) || marketAssets[0];
   }, [marketAssets, selectedSymbol]);
+
+  const closedPositions = useMemo(() => {
+    return trades.filter(t => t.status === 'closed');
+  }, [trades]);
+
+  const last10ClosedTrades = useMemo(() => {
+    // Sort closed trades oldest to newest (chronologically) so the line feeds left-to-right
+    const sorted = [...closedPositions].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    return sorted.slice(-10);
+  }, [closedPositions]);
+
+  const pnlChartData = useMemo(() => {
+    let runningTotal = 0;
+    return last10ClosedTrades.map((t, idx) => {
+      runningTotal += t.pnl;
+      return {
+        tradeIndex: `Trade #${idx + 1}`,
+        id: t.id.slice(0, 6).toUpperCase(),
+        symbol: t.symbol,
+        pnl: parseFloat(t.pnl.toFixed(2)),
+        cumulativePnl: parseFloat(runningTotal.toFixed(2)),
+        type: t.type.toUpperCase()
+      };
+    });
+  }, [last10ClosedTrades]);
 
   // CFD Stats calculations
   const positionStats = useMemo(() => {
@@ -70,7 +138,6 @@ export const CFDTrading: React.FC = () => {
   if (!user) return null;
 
   const openPositions = trades.filter(t => t.status === 'open');
-  const closedPositions = trades.filter(t => t.status === 'closed');
 
   return (
     <div className="space-y-6">
@@ -326,6 +393,87 @@ export const CFDTrading: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Realized P&L Performance Analytics */}
+      <div className="bg-white rounded-[32px] border border-natural-border p-5 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4.5 w-4.5 text-natural-primary" />
+            <h3 className="text-sm font-serif font-black text-natural-dark">Realized P&L Tracker (Last 10 Settled Positions)</h3>
+          </div>
+          <span className="text-[10px] text-natural-muted font-bold uppercase tracking-wider">Historical Analytics</span>
+        </div>
+
+        {closedPositions.length === 0 ? (
+          <div className="text-center py-10 rounded-2xl bg-[#F4F5F0]/30 border border-dashed border-natural-accent text-natural-secondary flex flex-col items-center justify-center p-6">
+            <Activity className="h-7 w-7 text-natural-muted/60 mb-2 animate-pulse" />
+            <p className="text-xs font-serif font-bold text-natural-dark">No realized performance data yet</p>
+            <p className="text-[10px] text-natural-muted mt-1 max-w-sm">
+              Your closed trade profits and losses will be plotted here in real-time as soon as you settle your first positions.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-4 text-xs font-bold font-mono text-natural-secondary">
+              <div className="flex items-center gap-1.5 bg-[#F4F5F0] px-3 py-1.5 rounded-lg border border-natural-border">
+                <span className="h-2 w-2 rounded-full bg-[#5A5A40]"></span>
+                <span>Individual P&L</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-[#F5F2E9] px-3 py-1.5 rounded-lg border border-natural-border">
+                <span className="h-2 w-2 rounded-full bg-[#D4AF37]"></span>
+                <span>Cumulative Net</span>
+              </div>
+            </div>
+            
+            <div className="h-72 w-full pr-4 select-none">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={pnlChartData}
+                  margin={{ top: 15, right: 10, left: -10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F4F5F0" vertical={false} />
+                  <XAxis 
+                    dataKey="tradeIndex" 
+                    stroke="#8B8D7A" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={{ stroke: '#EAECE0' }}
+                    fontWeight="bold"
+                  />
+                  <YAxis
+                    stroke="#8B8D7A"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: '#EAECE0' }}
+                    fontWeight="bold"
+                    tickFormatter={(value) => `$${value.toLocaleString()}`}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#EAECE0', strokeWidth: 1.5 }} />
+                  <ReferenceLine y={0} stroke="#D1D3C4" strokeWidth={1} strokeDasharray="5 5" />
+                  <Line
+                    type="monotone"
+                    dataKey="pnl"
+                    name="Individual P&L"
+                    stroke="#5A5A40"
+                    strokeWidth={2}
+                    dot={{ r: 4, stroke: '#5A5A40', strokeWidth: 1.5, fill: '#FFF' }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulativePnl"
+                    name="Cumulative Progression"
+                    stroke="#D4AF37"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, stroke: '#D4AF37', strokeWidth: 1.5, fill: '#FFF' }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
       </div>

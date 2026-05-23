@@ -4,7 +4,7 @@ import { ShieldCheck, Lock, Mail, User, TrendingUp, Cpu, Globe, Users, ArrowRigh
 import { motion } from 'motion/react';
 
 export const AuthScreen: React.FC = () => {
-  const { login, register } = useDashboard();
+  const { login, register, firebaseError } = useDashboard();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,6 +13,7 @@ export const AuthScreen: React.FC = () => {
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [error, setError] = useState('');
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,9 +40,25 @@ export const AuthScreen: React.FC = () => {
     }
 
     if (isLogin) {
-      login(email, password).catch((err: any) => setError(err.message || 'Login details are incorrect or missing.'));
+      login(email, password).catch((err: any) => {
+        const msg = err.message || String(err);
+        if (msg.includes('operation-not-allowed') || err.code === 'auth/operation-not-allowed') {
+          setError('Email/password login is currently disabled in your Firebase console. To resolve this, click Firebase Service Diagnostics below and enable the Email/Password Auth Provider.');
+          setShowDiagnostics(true);
+        } else {
+          setError(msg);
+        }
+      });
     } else {
-      register(email, password, name).catch((err: any) => setError(err.message || 'Account registration could not be provisioned.'));
+      register(email, password, name).catch((err: any) => {
+        const msg = err.message || String(err);
+        if (msg.includes('operation-not-allowed') || err.code === 'auth/operation-not-allowed') {
+          setError('Email/password registration is currently disabled in your Firebase console. To resolve this, click Firebase Service Diagnostics below and enable the Email/Password Auth Provider.');
+          setShowDiagnostics(true);
+        } else {
+          setError(msg);
+        }
+      });
     }
   };
 
@@ -310,6 +327,92 @@ export const AuthScreen: React.FC = () => {
                   <Cpu className="h-4 w-4 text-natural-primary group-hover:rotate-45 transition-transform" />
                   <span>LAUNCH SANDBOX SESSION (GIFT $1,000)</span>
                 </button>
+
+                {/* Firebase Connection & Auth Status Diagnostic Troubleshooter */}
+                <div className="mt-5 border-t border-[#E5E7D8] pt-4">
+                  <div className="flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowDiagnostics(prev => !prev)}
+                      className="text-[10px] text-natural-secondary hover:text-natural-dark font-extrabold flex items-center gap-1 cursor-pointer transition-colors uppercase tracking-wider"
+                    >
+                      <span>🛠️ Firebase Diagnostics</span>
+                      <span>{showDiagnostics ? '[-]' : '[+]'}</span>
+                    </button>
+                    
+                    {firebaseError && (
+                      <span className="inline-flex items-center gap-1 text-[9px] text-[#A25050] bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full font-black animate-pulse-subtle uppercase">
+                        ● Offline
+                      </span>
+                    )}
+                    {!firebaseError && (
+                      <span className="inline-flex items-center gap-1 text-[9px] text-[#5A5A40] bg-[#5A5A40]/5 px-2 py-0.5 rounded-full font-black uppercase">
+                        ● Ready
+                      </span>
+                    )}
+                  </div>
+
+                  {showDiagnostics && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3.5 space-y-3 bg-[#F4F5F0] rounded-xl p-3.5 border border-natural-border text-[10.5px] leading-relaxed text-natural-text font-semibold select-text"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-natural-dark text-xs font-serif">
+                          <span className={firebaseError ? "text-[#A25050]" : "text-[#5A5A40]"}>●</span>
+                          <span>Cloud Firestore Backend Status</span>
+                        </div>
+                        {firebaseError ? (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] text-rose-800 font-bold bg-rose-50/50 p-1.5 rounded border border-rose-100/60 font-mono">
+                              Error: {firebaseError}
+                            </p>
+                            <p className="text-[10px] leading-relaxed text-natural-secondary font-medium">
+                              Firestore backend returned a connectivity warning. This happens when the database instance takes a moment to cold-boot or when third-party cookies are blocked by browser iframe settings.
+                            </p>
+                            <a
+                              href="https://console.firebase.google.com/project/gen-lang-client-0088604903/firestore/databases/ai-studio-86c391b1-004e-4800-ac68-38d3c674c0c3/data"
+                              target="_blank"
+                              referrerPolicy="no-referrer"
+                              className="inline-block bg-[#5A5A40]/10 hover:bg-[#5A5A40]/20 text-[#5A5A40] font-black text-[9px] py-1 px-2.5 rounded border border-[#5A5A40]/20 transition-colors uppercase cursor-pointer"
+                            >
+                              Verify Firestore Console ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-natural-secondary font-medium">
+                            Firestore connected successfully! Default static collection schema is online and synchronizing.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1 border-t border-[#D1D3C4]/50 pt-2.5">
+                        <div className="flex items-center gap-1.5 font-bold text-natural-dark text-xs font-serif">
+                          <span className="text-[#5A5A40]">●</span>
+                          <span>Auth Email / Password Provider</span>
+                        </div>
+                        <p className="text-[10px] leading-relaxed text-natural-secondary font-medium">
+                          By default, Firebase projects require you to enable Email/Password provider dynamically in the cloud console. If you get `auth/operation-not-allowed`, click below to configure:
+                        </p>
+                        <div className="pt-1">
+                          <a
+                            href="https://console.firebase.google.com/project/gen-lang-client-0088604903/authentication/providers"
+                            target="_blank"
+                            referrerPolicy="no-referrer"
+                            className="inline-block bg-[#5A5A40]/10 hover:bg-[#5A5A40]/20 text-[#5A5A40] font-black text-[9px] py-1 px-2.5 rounded border border-[#5A5A40]/20 transition-colors uppercase cursor-pointer"
+                          >
+                            Enable Email/Password ↗
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 border-t border-[#D1D3C4]/50 pt-2 text-[9.5px] italic text-[#8B8D7A]">
+                        Note: You can instantly bypass all cloud setup blocks by clicking "LAUNCH SANDBOX SESSION" above to test all features with a sandbox balance of $1,000!
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
             )}
           </motion.div>

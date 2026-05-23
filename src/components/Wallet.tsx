@@ -63,6 +63,11 @@ export const Wallet: React.FC = () => {
 
     if (depositAmount <= 0) return;
 
+    const isConfirmed = window.confirm(
+      `CONFIRM DEPOSIT COMMIT:\nAre you sure you wish to submit a deposit of $${depositAmount.toLocaleString()} via ${currentMethod.name}?\n\nPlease ensure you have transferred the funds to the designated wallet address.`
+    );
+    if (!isConfirmed) return;
+
     try {
       // Trigger deposit transaction in pending flow
       await deposit(

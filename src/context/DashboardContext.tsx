@@ -27,6 +27,7 @@ interface DashboardContextType {
   marketAssets: MarketAsset[];
   investmentPlans: InvestmentPlan[];
   isSandbox: boolean;
+  firebaseError: string | null;
   login: (email: string, password?: string) => Promise<any>;
   register: (email: string, password?: string, name?: string) => Promise<any>;
   recoverPassword: (email: string) => Promise<{ success: boolean; isSandbox: boolean; message: string }>;
@@ -43,6 +44,10 @@ interface DashboardContextType {
   adminRejectTransaction: (txId: string) => void;
   triggerMarketTick: () => void;
   verifyAccount: () => void;
+  switchSandboxUser: (uid: string) => void;
+  createSandboxUser: (email: string, name: string) => User;
+  deleteSandboxUser: (uid: string) => void;
+  getSandboxUsers: () => User[];
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -123,6 +128,8 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return localStorage.getItem('is_sandbox') === 'true';
   });
 
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+
   // Keep references for stable ticking interval callbacks
   const stateRef = useRef({ user, investments, trades, marketAssets, copyTraders });
   stateRef.current = { user, investments, trades, marketAssets, copyTraders };
@@ -132,10 +139,10 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
+        setFirebaseError(null);
+      } catch (error: any) {
+        console.warn("Firestore connectivity test failed on startup:", error);
+        setFirebaseError(error.message || String(error));
       }
     }
     testConnection();
@@ -1108,6 +1115,79 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const getSandboxUsers = (): User[] => {
+    try {
+      const savedUsers = JSON.parse(localStorage.getItem('sandbox_users_db') || '{}');
+      return Object.values(savedUsers) as User[];
+    } catch {
+      return [];
+    }
+  };
+
+  const switchSandboxUser = (uid: string) => {
+    const savedUsers = JSON.parse(localStorage.getItem('sandbox_users_db') || '{}');
+    const matchedUser = Object.values(savedUsers).find((u: any) => u.id === uid) as User | undefined;
+    if (matchedUser) {
+      setIsSandbox(true);
+      localStorage.setItem('is_sandbox', 'true');
+      localStorage.setItem('sandbox_current_uid', uid);
+      setUser(matchedUser);
+      setTransactions(JSON.parse(localStorage.getItem(`sandbox_tx_${uid}`) || '[]'));
+      setInvestments(JSON.parse(localStorage.getItem(`sandbox_inv_${uid}`) || '[]'));
+      setTrades(JSON.parse(localStorage.getItem(`sandbox_trades_${uid}`) || '[]'));
+    }
+  };
+
+  const createSandboxUser = (email: string, name: string): User => {
+    const savedUsers = JSON.parse(localStorage.getItem('sandbox_users_db') || '{}');
+    const emailLower = email.trim().toLowerCase();
+    
+    const existing = Object.values(savedUsers).find((u: any) => u.email.toLowerCase() === emailLower);
+    if (existing) {
+      throw new Error(`User with email "${email}" is already registered in local database.`);
+    }
+    
+    const sandboxUid = 'sandbox_u_' + Math.random().toString(36).substring(2, 9);
+    const newUser: User = {
+      id: sandboxUid,
+      name: name.trim(),
+      email: emailLower,
+      balance: 0.00,
+      profits: 0,
+      totalWithdrawn: 0,
+      activeInvestmentsAmount: 0,
+      referralsEarned: 0,
+      referralCode: 'PY-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+      verificationStatus: 'unverified',
+      joinedAt: new Date().toISOString()
+    };
+    
+    savedUsers[emailLower] = newUser;
+    localStorage.setItem('sandbox_users_db', JSON.stringify(savedUsers));
+    localStorage.setItem(`sandbox_tx_${sandboxUid}`, JSON.stringify([]));
+    localStorage.setItem(`sandbox_inv_${sandboxUid}`, JSON.stringify([]));
+    localStorage.setItem(`sandbox_trades_${sandboxUid}`, JSON.stringify([]));
+    
+    return newUser;
+  };
+
+  const deleteSandboxUser = (uid: string) => {
+    const savedUsers = JSON.parse(localStorage.getItem('sandbox_users_db') || '{}');
+    const emailToDelete = Object.keys(savedUsers).find(email => savedUsers[email].id === uid);
+    
+    if (emailToDelete) {
+      delete savedUsers[emailToDelete];
+      localStorage.setItem('sandbox_users_db', JSON.stringify(savedUsers));
+      localStorage.removeItem(`sandbox_tx_${uid}`);
+      localStorage.removeItem(`sandbox_inv_${uid}`);
+      localStorage.removeItem(`sandbox_trades_${uid}`);
+      
+      if (user?.id === uid) {
+        logout();
+      }
+    }
+  };
+
   // Run the universal engine real-time interval
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1127,6 +1207,7 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         marketAssets,
         investmentPlans: INITIAL_PLANS,
         isSandbox,
+        firebaseError,
         login,
         register,
         recoverPassword,
@@ -1142,7 +1223,11 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         adminApproveTransaction,
         adminRejectTransaction,
         triggerMarketTick,
-        verifyAccount
+        verifyAccount,
+        switchSandboxUser,
+        createSandboxUser,
+        deleteSandboxUser,
+        getSandboxUsers
       }}
     >
       {children}
