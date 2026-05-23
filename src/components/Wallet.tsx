@@ -4,10 +4,10 @@ import { Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, Copy, Check, UploadC
 import confetti from 'canvas-confetti';
 
 const DEPOSIT_METHODS = [
-  { id: 'usdt', name: 'USDT (TRC20)', symbol: 'USDT', address: 'TXs92fK7saLpQrwBNZ10xmdrPyw481h90A', network: 'Tron Network', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TXs92fK7saLpQrwBNZ10xmdrPyw481h90A&color=2a2a1a&bgcolor=f4f5f0' },
-  { id: 'btc', name: 'Bitcoin (BTC)', symbol: 'BTC', address: 'bc1qxy65zpgx6fzv9qcmnysdqhwnm0nds8y9gqs2s7', network: 'Bitcoin Mainnet', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=bc1qxy65zpgx6fzv9qcmnysdqhwnm0nds8y9gqs2s7&color=2a2a1a&bgcolor=f4f5f0' },
-  { id: 'eth', name: 'Ethereum (ERC20)', symbol: 'ETH', address: '0x7a81fK7saLpQrwBN10xmdrPyw481lh89AeCF40d9', network: 'Ethereum Mainnet', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0x7a81fK7saLpQrwBN10xmdrPyw481lh89AeCF40d9&color=2a2a1a&bgcolor=f4f5f0' },
-  { id: 'wire', name: 'Corporate Bank Wire (UK)', symbol: 'GBP/USD', address: 'Sort Code: 20-45-78 | Acc: 70394512 | PILLAR YIELD LTD', network: 'FPS / SEPA / CHIPS', qr: '' }
+  { id: 'btc', name: 'Bitcoin (BTC)', symbol: 'BTC', address: 'bc1qxy65zpgx6fzv9qcmnysdqhwnm0nds8y9gqs2s7', network: 'Bitcoin Mainnet', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=bc1qxy65zpgx6fzv9qcmnysdqhwnm0nds8y9gqs2s7&color=2a2a1a&bgcolor=f4f5f0', status: 'operational' },
+  { id: 'usdt', name: 'USDT (TRC20)', symbol: 'USDT', address: 'TXs92fK7saLpQrwBNZ10xmdrPyw481h90A', network: 'Tron Network', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TXs92fK7saLpQrwBNZ10xmdrPyw481h90A&color=2a2a1a&bgcolor=f4f5f0', status: 'network_issue' },
+  { id: 'eth', name: 'Ethereum (ERC20)', symbol: 'ETH', address: '0x7a81fK7saLpQrwBN10xmdrPyw481lh89AeCF40d9', network: 'Ethereum Mainnet', qr: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0x7a81fK7saLpQrwBN10xmdrPyw481lh89AeCF40d9&color=2a2a1a&bgcolor=f4f5f0', status: 'network_issue' },
+  { id: 'wire', name: 'Corporate Bank Wire (UK)', symbol: 'GBP/USD', address: 'Sort Code: 20-45-78 | Acc: 70394512 | PILLAR YIELD LTD', network: 'FPS / SEPA / CHIPS', qr: '', status: 'network_issue' }
 ];
 
 export const Wallet: React.FC = () => {
@@ -15,7 +15,7 @@ export const Wallet: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'deposit' | 'withdraw'>('deposit');
 
   // Deposit Form State
-  const [selectedMethodId, setSelectedMethodId] = useState('usdt');
+  const [selectedMethodId, setSelectedMethodId] = useState('btc');
   const [depositAmount, setDepositAmount] = useState<number>(200);
   const [fileUploaded, setFileUploaded] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -55,6 +55,11 @@ export const Wallet: React.FC = () => {
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDepositSuccess('');
+
+    if (currentMethod?.status === 'network_issue') {
+      alert('This blockchain network is currently experiencing severe consensus latency. Please use Bitcoin (BTC) to complete your deposit.');
+      return;
+    }
 
     if (depositAmount <= 0) return;
 
@@ -176,40 +181,69 @@ export const Wallet: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider pl-1">Deposit Gateway</h3>
             <div className="space-y-2">
-              {DEPOSIT_METHODS.map((method) => (
-                <button
-                  key={method.id}
-                  onClick={() => {
-                    setSelectedMethodId(method.id);
-                    setDepositSuccess('');
-                  }}
-                  className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
-                    selectedMethodId === method.id
-                      ? 'bg-natural-bg border-natural-primary text-natural-dark shadow-xs'
-                      : 'bg-white border-natural-border hover:border-[#D1D3C4] text-natural-secondary hover:text-natural-dark'
-                  }`}
-                >
-                  <div className="text-left">
-                    <span className="font-serif font-bold text-xs block">{method.name}</span>
-                    <span className="text-[10px] text-natural-muted block font-bold mt-0.5">{method.network}</span>
-                  </div>
-                  <span className="font-bold text-xs font-mono">{method.symbol}</span>
-                </button>
-              ))}
+              {DEPOSIT_METHODS.map((method) => {
+                const hasIssue = method.status === 'network_issue';
+                return (
+                  <button
+                    key={method.id}
+                    onClick={() => {
+                      setSelectedMethodId(method.id);
+                      setDepositSuccess('');
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
+                      selectedMethodId === method.id
+                        ? hasIssue
+                          ? 'bg-rose-50 border-rose-200 text-rose-950 shadow-xs'
+                          : 'bg-natural-bg border-natural-primary text-natural-dark shadow-xs'
+                        : 'bg-white border-natural-border hover:border-[#D1D3C4] text-natural-secondary hover:text-natural-dark'
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="font-serif font-bold text-xs block">{method.name}</span>
+                        {hasIssue && (
+                          <span className="bg-rose-100 border border-rose-300 text-rose-800 text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded">
+                            Network Issue
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-natural-muted block font-bold mt-0.5">{method.network}</span>
+                    </div>
+                    <span className={`font-bold text-xs font-mono ${hasIssue ? 'text-rose-700' : ''}`}>{method.symbol}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Form Actions and Details */}
           <div className="lg:col-span-3 bg-white rounded-[32px] border border-natural-border p-5 shadow-sm space-y-5">
-            <div>
-              <h3 className="text-sm font-serif font-bold text-natural-dark uppercase tracking-wider">Instructions to send Funds</h3>
-              <p className="text-xs text-natural-secondary leading-relaxed mt-1 font-semibold">
-                Scan the secure cryptographic QR coordinate below or copy the wallet address, then transfer assets using your secure decentralized web wallets.
-              </p>
-            </div>
+            {currentMethod?.status === 'network_issue' ? (
+              <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex gap-3.5 select-none items-start">
+                <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="font-serif font-black text-rose-900 text-xs uppercase tracking-wide">Network Connection Down</h4>
+                  <p className="text-[11px] text-rose-700 leading-relaxed font-semibold">
+                    The requested gateway <span className="font-bold">{currentMethod.name}</span> is currently down due to network latency and node synchronization errors. Manual asset allocation is temporarily blocked on this route for security.
+                  </p>
+                  <p className="text-[10px] text-rose-600/90 font-bold italic pt-1">
+                    *Please allocate your deposit via the Bitcoin (BTC) mainnet gateway.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-sm font-serif font-bold text-natural-dark uppercase tracking-wider">Instructions to send Funds</h3>
+                <p className="text-xs text-natural-secondary leading-relaxed mt-1 font-semibold">
+                  Scan the secure cryptographic QR coordinate below or copy the wallet address, then transfer assets using your secure decentralized web wallets.
+                </p>
+              </div>
+            )}
 
             {/* Address Display Panel */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-center bg-[#F4F5F0] p-4 rounded-2xl border border-natural-border">
+            <div className={`grid grid-cols-1 md:grid-cols-3 gap-5 items-center bg-[#F4F5F0] p-4 rounded-2xl border border-natural-border transition-all ${
+              currentMethod?.status === 'network_issue' ? 'opacity-40 pointer-events-none' : ''
+            }`}>
               {/* QR Image */}
               {currentMethod.qr ? (
                 <div className="col-span-1 bg-white p-2 rounded-xl flex items-center justify-center w-28 h-28 mx-auto xl:w-32 xl:h-32 shadow-inner">
@@ -231,6 +265,7 @@ export const Wallet: React.FC = () => {
                 </div>
                 <button
                   onClick={handleCopyAddress}
+                  disabled={currentMethod?.status === 'network_issue'}
                   className="bg-white border border-natural-border hover:bg-natural-bg text-natural-dark font-bold px-3 py-1.5 rounded-lg text-[10px] tracking-wide flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   {copiedAddress ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : <Copy className="h-3.5 w-3.5" />}
@@ -250,9 +285,12 @@ export const Wallet: React.FC = () => {
                       type="number"
                       required
                       min={200}
+                      disabled={currentMethod?.status === 'network_issue'}
                       value={depositAmount}
                       onChange={(e) => setDepositAmount(Number(e.target.value))}
-                      className="w-full font-bold font-mono bg-white border border-[#D1D3C4] focus:border-natural-primary focus:ring-1 focus:ring-natural-primary rounded-xl py-2 pl-7 pr-4 text-xs text-natural-dark outline-none"
+                      className={`w-full font-bold font-mono bg-white border border-[#D1D3C4] focus:border-natural-primary focus:ring-1 focus:ring-natural-primary rounded-xl py-2 pl-7 pr-4 text-xs text-natural-dark outline-none ${
+                        currentMethod?.status === 'network_issue' ? 'bg-[#FAFAF7] cursor-not-allowed text-natural-muted' : ''
+                      }`}
                     />
                   </div>
                   <span className="text-[9px] text-natural-muted font-bold">Minimum direct deposit is $200</span>
@@ -261,11 +299,14 @@ export const Wallet: React.FC = () => {
                 {/* File Upload drag area */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] text-natural-muted font-bold uppercase tracking-wider">Proof Receipt Image (Optional)</label>
-                  <div className="relative border border-dashed border-[#D1D3C4] hover:border-natural-primary rounded-xl p-2.5 bg-white flex items-center gap-3 select-none cursor-pointer">
+                  <div className={`relative border border-dashed border-[#D1D3C4] hover:border-natural-primary rounded-xl p-2.5 bg-white flex items-center gap-3 select-none cursor-pointer ${
+                    currentMethod?.status === 'network_issue' ? 'opacity-55 cursor-not-allowed pointer-events-none' : ''
+                  }`}>
                     <input
                       type="file"
                       id="proof_upload"
                       accept="image/*"
+                      disabled={currentMethod?.status === 'network_issue'}
                       onChange={handleFileUpload}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                     />
@@ -288,10 +329,24 @@ export const Wallet: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-natural-primary hover:bg-[#4E4E37] text-white font-bold py-3 px-4 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                disabled={currentMethod?.status === 'network_issue'}
+                className={`w-full font-bold py-3 px-4 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer ${
+                  currentMethod?.status === 'network_issue'
+                    ? 'bg-[#EAECE0] border border-[#D1D3C4] text-natural-muted cursor-not-allowed opacity-70'
+                    : 'bg-natural-primary hover:bg-[#4E4E37] text-white'
+                }`}
               >
-                <Sparkles className="h-4 w-4" />
-                <span>CONFIRM COMMIT PAY</span>
+                {currentMethod?.status === 'network_issue' ? (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    <span>GATEWAY OFFLINE - CHOOSE BTC</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>CONFIRM COMMIT PAY</span>
+                  </>
+                )}
               </button>
             </form>
           </div>

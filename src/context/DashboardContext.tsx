@@ -313,7 +313,19 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Fallback to local sandbox if firebase option fails or is blocked
       const emailLower = email.trim().toLowerCase();
       const isDemo = emailLower === 'demo.trader@coinvest.cc';
-      const isBlockAuth = error?.code === 'auth/operation-not-allowed' || error?.message?.includes('operation-not-allowed') || error?.message?.includes('auth/configuration-not-found');
+      const isBlockAuth = 
+        error?.code === 'auth/operation-not-allowed' || 
+        error?.message?.includes('operation-not-allowed') || 
+        error?.message?.includes('auth/configuration-not-found') ||
+        error?.code === 'auth/network-request-failed' ||
+        error?.message?.includes('network-request-failed') ||
+        error?.code === 'auth/api-key-not-valid' ||
+        error?.message?.includes('api-key-not-valid') ||
+        error?.code === 'auth/invalid-api-key' ||
+        error?.message?.includes('invalid-api-key') ||
+        error?.message?.includes('network-error') ||
+        error?.message?.includes('quota-exceeded') ||
+        error?.message?.includes('internal-error');
 
       if (isDemo || isBlockAuth) {
         console.warn("Proceeding with Sandbox local storage login fallback.");
@@ -397,7 +409,19 @@ export const DashboardProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Fallback to local sandbox registration if firebase fails or is blocked
       const emailLower = email.trim().toLowerCase();
       const isAlreadyInUse = error?.code === 'auth/email-already-in-use' || error?.message?.includes('already-in-use');
-      const isBlockAuth = error?.code === 'auth/operation-not-allowed' || error?.message?.includes('operation-not-allowed') || error?.message?.includes('auth/configuration-not-found');
+      const isBlockAuth = 
+        error?.code === 'auth/operation-not-allowed' || 
+        error?.message?.includes('operation-not-allowed') || 
+        error?.message?.includes('auth/configuration-not-found') ||
+        error?.code === 'auth/network-request-failed' ||
+        error?.message?.includes('network-request-failed') ||
+        error?.code === 'auth/api-key-not-valid' ||
+        error?.message?.includes('api-key-not-valid') ||
+        error?.code === 'auth/invalid-api-key' ||
+        error?.message?.includes('invalid-api-key') ||
+        error?.message?.includes('network-error') ||
+        error?.message?.includes('quota-exceeded') ||
+        error?.message?.includes('internal-error');
 
       if (isAlreadyInUse || isBlockAuth) {
         console.warn("Falling back to local Sandbox Storage Registration.");
